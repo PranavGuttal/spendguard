@@ -1,0 +1,11 @@
+# SpendGuard purchasing rules. The AI proposes; these rules decide.
+currency_display: INR
+inr_per_usd: 88          # fixed demo rate; PayPal sandbox pays in USD
+monthly_budget_inr: 50000
+auto_approve_limit_inr: 5000   # above this -> NEEDS_APPROVAL
+hard_cap_inr: 25000            # above this -> BLOCK
+max_orders_per_day: 5
+price_tolerance_pct: 20
+duplicate_window_hours: 24
+approved_vendors: [sharma-tools, deccan-carbide, safeworks]
+allowed_categories: [tooling, consumables, safety]

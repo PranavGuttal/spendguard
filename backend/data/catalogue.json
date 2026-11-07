@@ -1,0 +1,184 @@
+{
+  "suppliers": [
+    {
+      "id": "sharma-tools",
+      "name": "Sharma Tools & Hardware",
+      "city": "Bengaluru",
+      "paypal_email": "sb-qsin4753706757@personal.example.com",
+      "categories": [
+        "tooling",
+        "consumables"
+      ],
+      "approved": true
+    },
+    {
+      "id": "deccan-carbide",
+      "name": "Deccan Carbide Inserts",
+      "city": "Pune",
+      "paypal_email": "sb-crsmx53722228@personal.example.com",
+      "categories": [
+        "tooling"
+      ],
+      "approved": true
+    },
+    {
+      "id": "safeworks",
+      "name": "SafeWorks Industrial Safety",
+      "city": "Chennai",
+      "paypal_email": "sb-c23si53750418@personal.example.com",
+      "categories": [
+        "safety",
+        "consumables"
+      ],
+      "approved": true
+    },
+    {
+      "id": "quickbuy-online",
+      "name": "QuickBuy Online Store",
+      "city": "Unknown",
+      "paypal_email": "not-approved@example.com",
+      "categories": [
+        "electronics",
+        "office"
+      ],
+      "approved": false
+    }
+  ],
+  "items": [
+    {
+      "id": "hss-bit-10",
+      "supplier_id": "sharma-tools",
+      "name": "HSS tool bit, 10 mm square",
+      "category": "tooling",
+      "unit": "piece",
+      "unit_price_inr": 160,
+      "usual_price_inr": 160
+    },
+    {
+      "id": "hss-bit-12",
+      "supplier_id": "sharma-tools",
+      "name": "HSS tool bit, 12 mm square",
+      "category": "tooling",
+      "unit": "piece",
+      "unit_price_inr": 210,
+      "usual_price_inr": 210
+    },
+    {
+      "id": "drill-set-hss",
+      "supplier_id": "sharma-tools",
+      "name": "HSS twist drill set, 1-13 mm (25 pcs)",
+      "category": "tooling",
+      "unit": "set",
+      "unit_price_inr": 1450,
+      "usual_price_inr": 1450
+    },
+    {
+      "id": "coolant-5l",
+      "supplier_id": "sharma-tools",
+      "name": "Soluble cutting oil coolant, 5 L",
+      "category": "consumables",
+      "unit": "can",
+      "unit_price_inr": 950,
+      "usual_price_inr": 950
+    },
+    {
+      "id": "emery-roll",
+      "supplier_id": "sharma-tools",
+      "name": "Emery cloth roll, 120 grit",
+      "category": "consumables",
+      "unit": "roll",
+      "unit_price_inr": 380,
+      "usual_price_inr": 380
+    },
+    {
+      "id": "insert-cnmg",
+      "supplier_id": "deccan-carbide",
+      "name": "Carbide insert CNMG 120408, box of 10",
+      "category": "tooling",
+      "unit": "box",
+      "unit_price_inr": 1800,
+      "usual_price_inr": 1800
+    },
+    {
+      "id": "insert-tnmg",
+      "supplier_id": "deccan-carbide",
+      "name": "Carbide insert TNMG 160404, box of 10",
+      "category": "tooling",
+      "unit": "box",
+      "unit_price_inr": 1650,
+      "usual_price_inr": 1650
+    },
+    {
+      "id": "insert-wnmg",
+      "supplier_id": "deccan-carbide",
+      "name": "Carbide insert WNMG 080408, box of 10",
+      "category": "tooling",
+      "unit": "box",
+      "unit_price_inr": 2100,
+      "usual_price_inr": 1700
+    },
+    {
+      "id": "boring-bar",
+      "supplier_id": "deccan-carbide",
+      "name": "Indexable boring bar, 16 mm shank",
+      "category": "tooling",
+      "unit": "piece",
+      "unit_price_inr": 3400,
+      "usual_price_inr": 3400
+    },
+    {
+      "id": "gloves-cut",
+      "supplier_id": "safeworks",
+      "name": "Cut-resistant gloves, pair",
+      "category": "safety",
+      "unit": "pair",
+      "unit_price_inr": 240,
+      "usual_price_inr": 240
+    },
+    {
+      "id": "goggles",
+      "supplier_id": "safeworks",
+      "name": "Safety goggles, anti-fog",
+      "category": "safety",
+      "unit": "piece",
+      "unit_price_inr": 180,
+      "usual_price_inr": 180
+    },
+    {
+      "id": "earplugs",
+      "supplier_id": "safeworks",
+      "name": "Foam earplugs, box of 100 pairs",
+      "category": "safety",
+      "unit": "box",
+      "unit_price_inr": 650,
+      "usual_price_inr": 650
+    },
+    {
+      "id": "shop-towels",
+      "supplier_id": "safeworks",
+      "name": "Cotton waste / shop towels, 5 kg",
+      "category": "consumables",
+      "unit": "bag",
+      "unit_price_inr": 520,
+      "usual_price_inr": 520
+    },
+    {
+      "id": "laptop",
+      "supplier_id": "quickbuy-online",
+      "name": "Laptop, 15 inch",
+      "category": "electronics",
+      "unit": "piece",
+      "unit_price_inr": 55000,
+      "usual_price_inr": 55000
+    },
+    {
+      "id": "printer-ink",
+      "supplier_id": "quickbuy-online",
+      "name": "Printer ink cartridge",
+      "category": "office",
+      "unit": "piece",
+      "unit_price_inr": 1200,
+      "usual_price_inr": 1200
+    }
+  ]
+}
