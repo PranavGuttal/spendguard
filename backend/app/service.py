@@ -11,12 +11,13 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from .agent import AgentResult, run_agent
+from .insights import Analyst
 from .config import Catalogue, Policy
 from .llm import LLM
 from .logs import inr, step
 from .models import Decision, Order, OrderLine, Payment
 from .paypal import Payer, PayPalError
-from .policy import Outcome, PastOrder, SpendContext, evaluate
+from .policy import DraftOrder, Outcome, PastOrder, SpendContext, evaluate
 from .tools import ToolContext, month_spend_inr
 
 ACTIVE = ("PAID", "PAYING", "PENDING_APPROVAL")
@@ -68,42 +69,55 @@ class SpendGuardService:
             if result.draft is None:
                 return {"order": None, "agent_message": result.message, "agent_steps": result.steps}
 
-            decision = evaluate(result.draft, self.policy, self.catalogue, self._spend_context(s, now))
-            if decision.hits:
-                step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}")
-                for h in decision.hits:
-                    step("RULES", f"  - [{h.outcome.value}] {h.message}")
-            else:
-                step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}  (passed every rule)")
-            order = Order(request_text=text, supplier_id=result.draft.supplier_id, total_inr=decision.total_inr,
-                          agent_reasoning=result.draft.reasoning, created_at=now)
-            order.status = {Outcome.APPROVE: "PAYING", Outcome.NEEDS_APPROVAL: "PENDING_APPROVAL",
-                            Outcome.BLOCK: "BLOCKED"}[decision.outcome]
-            s.add(order)
-            s.commit()
-            s.refresh(order)
-            for line in result.draft.lines:
-                item = self.catalogue.items.get(line.item_id)
-                s.add(OrderLine(order_id=order.id, item_id=line.item_id, qty=line.qty,
-                                item_name=item.name if item else f"(unknown) {line.item_id}",
-                                unit_price_inr=item.unit_price_inr if item else 0.0))
-            note = ""
-            if self.policy.is_raised(now):
-                note = (f"This month's budget is raised to ₹{self.policy.budget_for(now):,.0f} "
-                        f"(normally ₹{self.policy.monthly_budget_inr:,.0f}).")
-            s.add(Decision(order_id=order.id, outcome=decision.outcome.value, note=note,
-                           rules_fired_json=json.dumps(decision.to_dict()["rules_fired"]), decided_by="policy"))
-            s.commit()
+            view = self._decide_and_maybe_pay(s, text, result.draft, now)
+            return {"order": view, "agent_message": result.message, "agent_steps": result.steps}
 
-            step("ORDER", f"#{order.id} saved as {order.status}")
-            if decision.outcome is Outcome.APPROVE:
-                self._pay(s, order)
-            elif decision.outcome is Outcome.NEEDS_APPROVAL:
-                step("ORDER", f"#{order.id} is waiting in Approvals; nothing paid")
-            else:
-                step("ORDER", f"#{order.id} blocked; no money moves")
-            return {"order": self.order_view(s, order.id), "agent_message": result.message,
-                    "agent_steps": result.steps}
+    def submit_proposal(self, text: str, draft: DraftOrder, now: datetime | None = None) -> dict:
+        """Entry point for an outside agent (e.g. Claude Desktop over MCP) that has already
+        chosen the items. Exactly the same rules and payment path as the built-in agent."""
+        now = now or datetime.now()
+        step("REQUEST", f'"{text}" (proposed by an external agent)')
+        items = ", ".join(f"{l.qty} x {l.item_id}" for l in draft.lines) or "no items"
+        step("AGENT", f"propose_order: {draft.supplier_id or '?'} | {items}")
+        with Session(self.engine) as s:
+            return self._decide_and_maybe_pay(s, text, draft, now)
+
+    def _decide_and_maybe_pay(self, s: Session, text: str, draft: DraftOrder, now: datetime) -> dict:
+        """Rules decide; money moves only on APPROVE. Returns the order view."""
+        decision = evaluate(draft, self.policy, self.catalogue, self._spend_context(s, now))
+        if decision.hits:
+            step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}")
+            for h in decision.hits:
+                step("RULES", f"  - [{h.outcome.value}] {h.message}")
+        else:
+            step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}  (passed every rule)")
+        order = Order(request_text=text, supplier_id=draft.supplier_id, total_inr=decision.total_inr,
+                      agent_reasoning=draft.reasoning, created_at=now)
+        order.status = {Outcome.APPROVE: "PAYING", Outcome.NEEDS_APPROVAL: "PENDING_APPROVAL",
+                        Outcome.BLOCK: "BLOCKED"}[decision.outcome]
+        s.add(order)
+        s.commit()
+        s.refresh(order)
+        for line in draft.lines:
+            item = self.catalogue.items.get(line.item_id)
+            s.add(OrderLine(order_id=order.id, item_id=line.item_id, qty=line.qty,
+                            item_name=item.name if item else f"(unknown) {line.item_id}",
+                            unit_price_inr=item.unit_price_inr if item else 0.0))
+        note = ""
+        if self.policy.is_raised(now):
+            note = (f"This month's budget is raised to ₹{self.policy.budget_for(now):,.0f} "
+                    f"(normally ₹{self.policy.monthly_budget_inr:,.0f}).")
+        s.add(Decision(order_id=order.id, outcome=decision.outcome.value, note=note,
+                       rules_fired_json=json.dumps(decision.to_dict()["rules_fired"]), decided_by="policy"))
+        s.commit()
+        step("ORDER", f"#{order.id} saved as {order.status}")
+        if decision.outcome is Outcome.APPROVE:
+            self._pay(s, order)
+        elif decision.outcome is Outcome.NEEDS_APPROVAL:
+            step("ORDER", f"#{order.id} is waiting in Approvals; nothing paid")
+        else:
+            step("ORDER", f"#{order.id} blocked; no money moves")
+        return self.order_view(s, order.id)
 
     def approve(self, order_id: int, note: str = "") -> dict:
         with Session(self.engine) as s:
@@ -137,6 +151,13 @@ class SpendGuardService:
             if payment and payment.paypal_batch_id and order.status == "PAYING":
                 self._poll(s, order, payment, attempts=1)
             return self.order_view(s, order.id)
+
+    def ask(self, question: str, now: datetime | None = None) -> dict:
+        """Read-only spending questions, answered by the AI from orders and PayPal data."""
+        with Session(self.engine) as s:
+            analyst = Analyst(self.catalogue, self.policy, s, lambda: self.payer, now or datetime.now())
+            result = analyst.ask(question, self.llm)
+            return {"answer": result.answer, "tools_used": result.tools_used}
 
     def reset_demo(self) -> None:
         """Delete all orders, decisions and payment records (sandbox demo only)."""

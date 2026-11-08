@@ -1,0 +1,32 @@
+# Render Blueprint: one free web service that serves both the API and the web app.
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo. Render asks for the secret values.
+services:
+  - type: web
+    name: spendguard
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PAYPAL_ENV
+        value: sandbox            # SpendGuard refuses to run against live PayPal
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: MAX_REQUESTS_PER_HOUR
+        value: "20"               # protects your free Groq quota during judging
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PAYPAL_CLIENT_ID     # sandbox credentials; Render asks for them once
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DEMO_PASSWORD        # judges type this to place orders; put it in the Devpost testing notes
+        sync: false

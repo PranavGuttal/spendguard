@@ -170,6 +170,16 @@ code { font-size: .92em; background: var(--steel-soft); padding: 1px 5px; border
 }
 @media (prefers-reduced-motion: reduce) { .po--fresh .stamp { animation: none; } }
 
+/* ---------- ask about spending ---------- */
+.ask { background: var(--panel); border: 1px solid var(--steel); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+.ask__title { margin: 0 0 10px; font-size: 18px; font-weight: 600; }
+.ask__row { display: flex; gap: 10px; margin-bottom: 10px; }
+.ask__input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--steel); border-radius: var(--radius); background: #FAFBFC; }
+.ask__input:focus { border-color: var(--dye); background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(47,79,181,.2); }
+.ask__answer { margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--dye); background: #ECEFFA; border-radius: 0 4px 4px 0; }
+.ask__answer p { margin: 0; white-space: pre-line; }
+.ask__used { margin-top: 6px !important; font-size: 13px; color: var(--ink-soft); }
+
 /* ---------- grids ---------- */
 .grid-wrap { width: 100%; min-height: 200px; }
 .pill { font-weight: 600; font-size: 13px; padding: 2px 9px; border-radius: 10px; background: var(--steel-soft); }

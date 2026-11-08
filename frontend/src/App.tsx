@@ -104,7 +104,7 @@ export default function App() {
         )}
         {view === 'buy' && <PurchasePage orders={orders} onOrder={onOrder} onError={onError} />}
         {view === 'approvals' && <ApprovalsPage orders={orders} onOrder={onOrder} onError={onError} />}
-        {view === 'orders' && <OrdersPage orders={orders} />}
+        {view === 'orders' && <OrdersPage orders={orders} onError={onError} />}
         {view === 'audit' && <AuditPage version={version} onError={onError} />}
         {view === 'rules' && <RulesPage onError={onError} />}
       </main>

@@ -43,6 +43,7 @@ export const api = {
   audit: () => call<AuditRow[]>('/api/audit'),
   policy: () => call<Policy>('/api/policy'),
   catalogue: () => call<Catalogue>('/api/catalogue'),
+  ask: (question: string) => call<{ answer: string; tools_used: string[] }>('/api/ask', { method: 'POST', body: JSON.stringify({ question }) }),
   reset: () => call<{ ok: boolean }>('/api/demo/reset', { method: 'POST' }),
 }
 

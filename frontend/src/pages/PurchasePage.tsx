@@ -82,7 +82,7 @@ export function PurchasePage({ orders, onOrder, onError }: Props) {
         ) : (
           <div className="po-list">
             {orders.slice(0, 8).map((o) => (
-              <OrderCard key={o.id} order={o} fresh={o.id === freshId} onChange={onOrder} onError={(m) => onError(m)} />
+              <OrderCard key={o.id} order={o} fresh={o.id === freshId} onChange={onOrder} onError={onError} />
             ))}
           </div>
         )}

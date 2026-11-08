@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 import httpx
@@ -17,6 +18,7 @@ class PayPalError(RuntimeError):
 class Payer(Protocol):
     def create_payout(self, sender_batch_id: str, receiver_email: str, amount_usd: float, note: str) -> dict: ...
     def get_payout(self, payout_batch_id: str) -> dict: ...
+    def list_transactions(self, days: int = 31) -> dict: ...
 
 
 class PayPalClient:
@@ -64,4 +66,25 @@ class PayPalClient:
         r = httpx.get(f"{self.base}/v1/payments/payouts/{payout_batch_id}", headers=self._auth_header(), timeout=self.timeout)
         if r.status_code >= 400:
             raise PayPalError(f"Payout status failed {r.status_code}: {r.text[:300]}")
+        return r.json()
+
+    def list_transactions(self, days: int = 31) -> dict:
+        """PayPal Transaction Search (GET /v1/reporting/transactions): this account's
+        successful transactions in the last `days` days (PayPal allows at most 31).
+        Needs "Transaction search" ticked in the app's features; sandbox data can lag up to ~3 hours."""
+        days = max(1, min(int(days), 31))
+        end = datetime.now(timezone.utc).replace(microsecond=0)
+        start = end - timedelta(days=days)
+        params = {
+            "start_date": start.isoformat().replace("+00:00", "Z"),
+            "end_date": end.isoformat().replace("+00:00", "Z"),
+            "transaction_status": "S",
+            "fields": "transaction_info",
+            "page_size": 100,
+            "page": 1,
+        }
+        r = httpx.get(f"{self.base}/v1/reporting/transactions", headers=self._auth_header(),
+                      params=params, timeout=self.timeout)
+        if r.status_code >= 400:
+            raise PayPalError(f"Transaction search failed {r.status_code}: {r.text[:300]}")
         return r.json()

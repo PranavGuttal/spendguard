@@ -2,7 +2,7 @@ import { OrderCard } from '../components/OrderCard'
 import type { Order } from '../types'
 
 export function ApprovalsPage({ orders, onOrder, onError }: {
-  orders: Order[]; onOrder: (o: Order) => void; onError: (m: string) => void
+  orders: Order[]; onOrder: (o: Order) => void; onError: (m: string, status?: number) => void
 }) {
   const pending = orders.filter((o) => o.status === 'PENDING_APPROVAL')
   return (

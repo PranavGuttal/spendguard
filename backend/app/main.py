@@ -43,7 +43,10 @@ async def lifespan(app: FastAPI):
         service = build_service()
     for month, amount in sorted(service.policy.budget_overrides.items()):
         step("BUDGET", f"{month}: budget raised to INR {amount:,.0f} (normal INR {service.policy.monthly_budget_inr:,.0f})")
-    step("START", f"SpendGuard ready: AI = {os.getenv('LLM_PROVIDER', 'groq')}, PayPal = {os.getenv('PAYPAL_ENV', 'sandbox')}. Open http://127.0.0.1:8000")
+    url = os.getenv("RENDER_EXTERNAL_URL") or "http://127.0.0.1:8000"
+    step("START", f"SpendGuard ready: AI = {os.getenv('LLM_PROVIDER', 'groq')}, PayPal = {os.getenv('PAYPAL_ENV', 'sandbox')}. Open {url}")
+    if not os.getenv("DEMO_PASSWORD"):
+        step("START", "No DEMO_PASSWORD set: anyone who can open this app can place orders (fine on your own PC).")
     yield
 
 
@@ -64,7 +67,7 @@ def get_service() -> SpendGuardService:
 def check_password(x_demo_password: str | None = Header(default=None)) -> None:
     expected = os.getenv("DEMO_PASSWORD", "")
     if expected and x_demo_password != expected:
-        raise HTTPException(401, "Wrong or missing demo password (X-Demo-Password header).")
+        raise HTTPException(401, "This demo needs a password to place or approve orders. Enter it below; it is in the Devpost testing notes.")
 
 
 _REQUEST_TIMES: deque[float] = deque()
@@ -82,6 +85,10 @@ def rate_limit() -> None:
 
 class PurchaseRequest(BaseModel):
     text: str = Field(min_length=3, max_length=500, examples=["20 HSS tool bits for the lathe"])
+
+
+class Question(BaseModel):
+    question: str = Field(min_length=3, max_length=300, examples=["How much did we spend on carbide inserts this month?"])
 
 
 class OwnerNote(BaseModel):
@@ -102,6 +109,16 @@ def create_request(body: PurchaseRequest, svc: SpendGuardService = Depends(get_s
         raise HTTPException(502, f"AI model error: {exc}")
     except PayPalError as exc:
         raise HTTPException(502, f"PayPal error: {exc}")
+
+
+@app.post("/api/ask", dependencies=[Depends(check_password), Depends(rate_limit)])
+def ask(body: Question, svc: SpendGuardService = Depends(get_service)):
+    """Ask about spending. Read-only: the AI can look at orders and PayPal transactions but cannot buy or pay."""
+    try:
+        return svc.ask(body.question.strip())
+    except LLMError as exc:
+        step("ERROR", f"AI model error: {str(exc)[:200]}")
+        raise HTTPException(502, f"AI model error: {exc}")
 
 
 @app.get("/api/orders")

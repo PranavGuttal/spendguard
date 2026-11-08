@@ -18,14 +18,17 @@ import sys
 log = logging.getLogger("spendguard")
 
 
-def setup_logging() -> None:
+def setup_logging(stream=None) -> None:
+    """Logs go to stdout for the web server. The MCP server passes stderr, because
+    over stdio its stdout carries the MCP protocol itself."""
     if getattr(log, "_configured", False):
         return
+    stream = stream or sys.stdout
     try:  # a Windows console that cannot print a character (e.g. ₹) must never crash the server
-        sys.stdout.reconfigure(errors="replace")  # type: ignore[union-attr]
+        stream.reconfigure(errors="replace")  # type: ignore[union-attr]
     except (AttributeError, ValueError):
         pass
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter("%(asctime)s  %(message)s", datefmt="%H:%M:%S"))
     log.addHandler(handler)
     log.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())

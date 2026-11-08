@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, inr, usd, when } from '../api'
+import { api, ApiError, inr, usd, when } from '../api'
 import type { Order } from '../types'
 import { Stamp } from './Stamp'
 
@@ -7,7 +7,7 @@ interface Props {
   order: Order
   fresh?: boolean
   onChange: (o: Order) => void
-  onError: (msg: string) => void
+  onError: (msg: string, status?: number) => void
 }
 
 export function OrderCard({ order, fresh, onChange, onError }: Props) {
@@ -21,7 +21,7 @@ export function OrderCard({ order, fresh, onChange, onError }: Props) {
     try {
       onChange(await api[kind](order.id))
     } catch (e) {
-      onError((e as Error).message)
+      onError((e as Error).message, e instanceof ApiError ? e.status : undefined)
     } finally {
       setBusy(null)
     }
