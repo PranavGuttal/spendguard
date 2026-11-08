@@ -29,7 +29,7 @@ Try these three requests:
 
 ## How it is built
 
-- `backend/app/agent.py`: the AI agent (Llama on Groq). It can search the catalogue and propose an order. It cannot pay.
+- `backend/app/agent.py`: the AI agent (GPT-OSS 120B on Groq). It can search the catalogue and propose an order. It cannot pay.
 - `backend/app/policy.py`: nine plain-code rules that return APPROVE, NEEDS_APPROVAL or BLOCK.
 - `backend/app/service.py`: the only place money moves, and only after APPROVE or the owner's click.
 - `backend/app/paypal.py`: PayPal Payouts (sandbox), one payout per order (the order id is the idempotency key).

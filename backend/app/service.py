@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 from .agent import AgentResult, run_agent
 from .config import Catalogue, Policy
 from .llm import LLM
+from .logs import inr, step
 from .models import Decision, Order, OrderLine, Payment
 from .paypal import Payer, PayPalError
 from .policy import Outcome, PastOrder, SpendContext, evaluate
@@ -60,6 +61,7 @@ class SpendGuardService:
     # ------------------------------------------------------------------ flow
     def submit_request(self, text: str, now: datetime | None = None) -> dict:
         now = now or datetime.now()
+        step("REQUEST", f'"{text}"')
         with Session(self.engine) as s:
             ctx = ToolContext(self.catalogue, self.policy, s, now)
             result: AgentResult = run_agent(text, self.llm, ctx)
@@ -67,6 +69,12 @@ class SpendGuardService:
                 return {"order": None, "agent_message": result.message, "agent_steps": result.steps}
 
             decision = evaluate(result.draft, self.policy, self.catalogue, self._spend_context(s, now))
+            if decision.hits:
+                step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}")
+                for h in decision.hits:
+                    step("RULES", f"  - [{h.outcome.value}] {h.message}")
+            else:
+                step("RULES", f"{decision.outcome.value}  {inr(decision.total_inr)}  (passed every rule)")
             order = Order(request_text=text, supplier_id=result.draft.supplier_id, total_inr=decision.total_inr,
                           agent_reasoning=result.draft.reasoning, created_at=now)
             order.status = {Outcome.APPROVE: "PAYING", Outcome.NEEDS_APPROVAL: "PENDING_APPROVAL",
@@ -79,12 +87,21 @@ class SpendGuardService:
                 s.add(OrderLine(order_id=order.id, item_id=line.item_id, qty=line.qty,
                                 item_name=item.name if item else f"(unknown) {line.item_id}",
                                 unit_price_inr=item.unit_price_inr if item else 0.0))
-            s.add(Decision(order_id=order.id, outcome=decision.outcome.value,
+            note = ""
+            if self.policy.is_raised(now):
+                note = (f"This month's budget is raised to ₹{self.policy.budget_for(now):,.0f} "
+                        f"(normally ₹{self.policy.monthly_budget_inr:,.0f}).")
+            s.add(Decision(order_id=order.id, outcome=decision.outcome.value, note=note,
                            rules_fired_json=json.dumps(decision.to_dict()["rules_fired"]), decided_by="policy"))
             s.commit()
 
+            step("ORDER", f"#{order.id} saved as {order.status}")
             if decision.outcome is Outcome.APPROVE:
                 self._pay(s, order)
+            elif decision.outcome is Outcome.NEEDS_APPROVAL:
+                step("ORDER", f"#{order.id} is waiting in Approvals; nothing paid")
+            else:
+                step("ORDER", f"#{order.id} blocked; no money moves")
             return {"order": self.order_view(s, order.id), "agent_message": result.message,
                     "agent_steps": result.steps}
 
@@ -94,6 +111,7 @@ class SpendGuardService:
             if order.status != "PENDING_APPROVAL":
                 raise InvalidState(f"Order {order_id} is {order.status}; only PENDING_APPROVAL orders can be approved.")
             s.add(Decision(order_id=order.id, outcome="APPROVE", decided_by="owner", note=note))
+            step("OWNER", f"approved order #{order.id} ({inr(order.total_inr)})")
             order.status = "PAYING"
             s.add(order)
             s.commit()
@@ -106,6 +124,7 @@ class SpendGuardService:
             if order.status != "PENDING_APPROVAL":
                 raise InvalidState(f"Order {order_id} is {order.status}; only PENDING_APPROVAL orders can be rejected.")
             s.add(Decision(order_id=order.id, outcome="REJECT", decided_by="owner", note=note))
+            step("OWNER", f"rejected order #{order.id}; nothing paid")
             order.status = "REJECTED"
             s.add(order)
             s.commit()
@@ -132,6 +151,7 @@ class SpendGuardService:
         sender_batch_id = f"spendguard-order-{order.id}"  # idempotency key: one payout per order, ever
         existing = s.exec(select(Payment).where(Payment.sender_batch_id == sender_batch_id)).first()
         if existing is not None:
+            step("PAYPAL", f"order #{order.id} already has a payout ({existing.status}); not paying again")
             return
         supplier = self.catalogue.suppliers[order.supplier_id]
         amount_usd = round(order.total_inr / self.policy.inr_per_usd, 2)
@@ -139,10 +159,12 @@ class SpendGuardService:
                           receiver_email=supplier.paypal_email, amount_usd=amount_usd)
         s.add(payment)
         s.commit()
+        step("PAYPAL", f"creating payout USD {amount_usd:.2f} -> {supplier.paypal_email} (id {sender_batch_id})")
         try:
             resp = self.payer.create_payout(sender_batch_id, supplier.paypal_email, amount_usd,
                                             f"SpendGuard order #{order.id}: {order.request_text[:200]}")
         except PayPalError as exc:
+            step("PAYPAL", f"payout FAILED for order #{order.id}: {str(exc)[:200]}")
             payment.status, payment.raw_json = "FAILED", json.dumps({"error": str(exc)})
             order.status = "FAILED"
             s.add(payment)
@@ -155,6 +177,7 @@ class SpendGuardService:
         payment.raw_json = json.dumps(resp)[:5000]
         s.add(payment)
         s.commit()
+        step("PAYPAL", f"payout batch {payment.paypal_batch_id} created ({payment.status})")
         self._poll(s, order, payment, attempts=self.poll_attempts)
 
     def _poll(self, s: Session, order: Order, payment: Payment, attempts: int) -> None:
@@ -175,6 +198,7 @@ class SpendGuardService:
             s.add(payment)
             s.add(order)
             s.commit()
+            step("PAYPAL", f"payout status: {payment.status} -> order #{order.id} {order.status}")
             if order.status != "PAYING":
                 return
             if i + 1 < attempts:
@@ -229,8 +253,10 @@ class SpendGuardService:
         with Session(self.engine) as s:
             spent = month_spend_inr(s, now)
             held = sum(o.total_inr for o in s.exec(select(Order).where(Order.status == "PENDING_APPROVAL")).all())
-            return {"monthly_budget_inr": self.policy.monthly_budget_inr, "spent_inr": spent,
-                    "pending_approval_inr": held, "remaining_inr": self.policy.monthly_budget_inr - spent,
+            budget = self.policy.budget_for(now)
+            return {"monthly_budget_inr": budget, "normal_monthly_budget_inr": self.policy.monthly_budget_inr,
+                    "raised_this_month": self.policy.is_raised(now), "spent_inr": spent,
+                    "pending_approval_inr": held, "remaining_inr": budget - spent,
                     "auto_approve_limit_inr": self.policy.auto_approve_limit_inr,
                     "hard_cap_inr": self.policy.hard_cap_inr}
 

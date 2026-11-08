@@ -22,6 +22,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # repo-root .env
 
 from .config import load_catalogue, load_policy  # noqa: E402
 from .db import engine, init_db  # noqa: E402
+from .logs import setup_logging, step  # noqa: E402
 from .llm import LLMError, OpenAICompatibleLLM  # noqa: E402
 from .paypal import PayPalClient, PayPalError  # noqa: E402
 from .service import InvalidState, OrderNotFound, SpendGuardService  # noqa: E402
@@ -36,9 +37,13 @@ def build_service() -> SpendGuardService:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global service
+    setup_logging()
     init_db()
     if service is None:
         service = build_service()
+    for month, amount in sorted(service.policy.budget_overrides.items()):
+        step("BUDGET", f"{month}: budget raised to INR {amount:,.0f} (normal INR {service.policy.monthly_budget_inr:,.0f})")
+    step("START", f"SpendGuard ready: AI = {os.getenv('LLM_PROVIDER', 'groq')}, PayPal = {os.getenv('PAYPAL_ENV', 'sandbox')}. Open http://127.0.0.1:8000")
     yield
 
 
@@ -93,6 +98,7 @@ def create_request(body: PurchaseRequest, svc: SpendGuardService = Depends(get_s
     try:
         return svc.submit_request(body.text.strip())
     except LLMError as exc:
+        step("ERROR", f"AI model error: {str(exc)[:200]}")
         raise HTTPException(502, f"AI model error: {exc}")
     except PayPalError as exc:
         raise HTTPException(502, f"PayPal error: {exc}")
@@ -144,7 +150,11 @@ def audit(svc: SpendGuardService = Depends(get_service)):
 @app.get("/api/policy")
 def policy(svc: SpendGuardService = Depends(get_service)):
     p = svc.policy
-    return {"monthly_budget_inr": p.monthly_budget_inr, "auto_approve_limit_inr": p.auto_approve_limit_inr,
+    from datetime import datetime
+    now = datetime.now()
+    return {"monthly_budget_inr": p.monthly_budget_inr, "this_month_budget_inr": p.budget_for(now),
+            "budget_overrides": dict(sorted(p.budget_overrides.items())),
+            "auto_approve_limit_inr": p.auto_approve_limit_inr,
             "hard_cap_inr": p.hard_cap_inr, "max_orders_per_day": p.max_orders_per_day,
             "price_tolerance_pct": p.price_tolerance_pct, "duplicate_window_hours": p.duplicate_window_hours,
             "approved_vendors": sorted(p.approved_vendors), "allowed_categories": sorted(p.allowed_categories),

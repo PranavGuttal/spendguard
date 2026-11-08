@@ -110,10 +110,11 @@ def search_catalogue(ctx: ToolContext, query: str) -> dict:
 
 def get_budget_status(ctx: ToolContext) -> dict:
     spent = month_spend_inr(ctx.session, ctx.now)
+    budget = ctx.policy.budget_for(ctx.now)
     return {
-        "monthly_budget_inr": ctx.policy.monthly_budget_inr,
+        "monthly_budget_inr": budget,
         "spent_this_month_inr": spent,
-        "remaining_inr": ctx.policy.monthly_budget_inr - spent,
+        "remaining_inr": budget - spent,
         "auto_approve_limit_inr": ctx.policy.auto_approve_limit_inr,
     }
 

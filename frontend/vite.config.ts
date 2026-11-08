@@ -6,5 +6,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: { proxy: { '/api': 'http://127.0.0.1:8000' } },
-  build: { outDir: '../backend/static', emptyOutDir: true },
+  build: {
+    outDir: '../backend/static',
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
+    // fixed names, so each rebuild replaces the same files instead of adding new ones
+    rolldownOptions: { output: { entryFileNames: 'assets/app.js', assetFileNames: 'assets/[name][extname]' } },
+  },
 })

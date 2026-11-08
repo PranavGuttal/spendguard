@@ -17,7 +17,12 @@ export function AuditPage({ version, onError }: { version: number; onError: (m: 
     by: r.decided_by === 'policy' ? 'Rules' : 'Owner',
     outcome: OUTCOME[r.outcome] ?? r.outcome,
     key: r.outcome.toLowerCase(),
-    reasons: r.rules_fired.length ? r.rules_fired.map((x) => x.message).join(' ') : (r.note || (r.decided_by === 'policy' ? 'Passed every rule.' : r.outcome === 'APPROVE' ? 'Approved by you, so PayPal paid it.' : 'Rejected by you, so nothing was paid.')),
+    reasons: [
+      r.rules_fired.length ? r.rules_fired.map((x) => x.message).join(' ')
+        : r.decided_by === 'policy' ? 'Passed every rule.'
+        : r.note ? '' : r.outcome === 'APPROVE' ? 'Approved by you, so PayPal paid it.' : 'Rejected by you, so nothing was paid.',
+      r.note,
+    ].filter(Boolean).join(' '),
   })), [rows])
 
   const cols: ColDef<(typeof data)[number]>[] = useMemo(() => [

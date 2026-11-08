@@ -172,3 +172,15 @@ def test_web_app_is_served(monkeypatch):
         r = client.get("/")
         assert r.status_code == 200
         assert ("SpendGuard" in r.text) or ("SpendGuard API is running" in r.text)
+
+
+def test_budget_override_shows_in_budget_and_audit():
+    from dataclasses import replace
+    svc = make(FakeLLM("HSS tool bit", "sharma-tools", [("hss-bit-10", 20)]), FakePayPal())
+    svc.policy = replace(svc.policy, budget_overrides={"2026-11": 80000.0})
+    svc.submit_request("20 HSS tool bits", now=NOW)
+    b = svc.budget(now=NOW)
+    assert b["monthly_budget_inr"] == 80000 and b["normal_monthly_budget_inr"] == 50000 and b["raised_this_month"]
+    assert b["remaining_inr"] == 80000 - 3200
+    assert "raised to ₹80,000" in svc.audit()[0]["note"]
+    assert svc.budget(now=datetime(2026, 12, 1))["monthly_budget_inr"] == 50000

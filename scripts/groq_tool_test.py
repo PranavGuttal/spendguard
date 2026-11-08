@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 KEY = os.getenv("GROQ_API_KEY")
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 if not KEY:
     sys.exit("Fill GROQ_API_KEY in .env first.")
 

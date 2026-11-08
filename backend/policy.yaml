@@ -2,6 +2,11 @@
 currency_display: INR
 inr_per_usd: 88          # fixed demo rate; PayPal sandbox pays in USD
 monthly_budget_inr: 50000
+# One-off budget for a single month ("YYYY-MM": amount). It ends by itself the next month.
+# Example: raise November 2026 to 80,000 without touching December:
+#   budget_overrides:
+#     "2026-11": 80000
+budget_overrides: {}
 auto_approve_limit_inr: 5000   # above this -> NEEDS_APPROVAL
 hard_cap_inr: 25000            # above this -> BLOCK
 max_orders_per_day: 5

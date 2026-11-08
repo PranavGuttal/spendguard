@@ -127,10 +127,13 @@ def evaluate(draft: DraftOrder, policy: Policy, catalogue: Catalogue, ctx: Spend
                 f"Category '{item.category}' ({item.name}) is not allowed.")
 
     # --- Rule 3: monthly budget
-    remaining = policy.monthly_budget_inr - ctx.spent_this_month_inr
+    month_budget = policy.budget_for(ctx.now)
+    remaining = month_budget - ctx.spent_this_month_inr
     if total > remaining:
+        raised = (f" (this month's budget is raised to ₹{month_budget:,.0f})"
+                  if policy.is_raised(ctx.now) else "")
         hit("monthly_budget", Outcome.BLOCK,
-            f"Order of ₹{total:,.0f} exceeds the remaining monthly budget of ₹{max(remaining, 0):,.0f}.")
+            f"Order of ₹{total:,.0f} exceeds the remaining monthly budget of ₹{max(remaining, 0):,.0f}{raised}.")
 
     # --- Rule 4: hard cap per order
     if total > policy.hard_cap_inr:

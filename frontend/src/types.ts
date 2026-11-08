@@ -31,6 +31,8 @@ export interface RequestResult {
 
 export interface Budget {
   monthly_budget_inr: number
+  normal_monthly_budget_inr: number
+  raised_this_month: boolean
   spent_inr: number
   pending_approval_inr: number
   remaining_inr: number
@@ -40,6 +42,8 @@ export interface Budget {
 
 export interface Policy {
   monthly_budget_inr: number
+  this_month_budget_inr: number
+  budget_overrides: Record<string, number>
   auto_approve_limit_inr: number
   hard_cap_inr: number
   max_orders_per_day: number

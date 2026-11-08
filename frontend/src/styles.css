@@ -71,6 +71,7 @@ code { font-size: .92em; background: var(--steel-soft); padding: 1px 5px; border
 .budget--loading { color: var(--muted); font-size: 14px; }
 .budget__left { margin: 0; font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .budget__of { margin: -2px 0 2px; font-size: 14px; color: var(--ink-soft); }
+.budget__raised { margin: -2px 0 2px; font-size: 13px; color: var(--hold); font-weight: 600; }
 .budget__track { display: flex; height: 10px; background: var(--steel-soft); border-radius: 5px; overflow: hidden; }
 .budget__spent { background: var(--ink); }
 .budget__held { background: var(--hold); opacity: .7; }

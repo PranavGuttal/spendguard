@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -10,6 +13,34 @@ import yaml
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 POLICY_PATH = BACKEND_DIR / "policy.yaml"
 CATALOGUE_PATH = BACKEND_DIR / "data" / "catalogue.json"
+_MONTH_KEY = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+_log = logging.getLogger("spendguard")
+
+
+def _parse_overrides(raw) -> dict[str, float]:
+    """budget_overrides: {"2026-11": 80000}. Bad entries are skipped with a warning,
+    so a typo can never remove the budget."""
+    out: dict[str, float] = {}
+    if not raw:
+        return out
+    if not isinstance(raw, dict):
+        _log.warning("policy.yaml: budget_overrides must be a list of \"YYYY-MM\": amount lines; ignoring it")
+        return out
+    for key, value in raw.items():
+        key = str(key).strip()
+        if not _MONTH_KEY.match(key):
+            _log.warning("policy.yaml: budget override %r ignored: the month must look like \"2026-11\"", key)
+            continue
+        try:
+            amount = float(value)
+        except (TypeError, ValueError):
+            _log.warning("policy.yaml: budget override for %s ignored: %r is not a number", key, value)
+            continue
+        if amount <= 0:
+            _log.warning("policy.yaml: budget override for %s ignored: the amount must be above zero", key)
+            continue
+        out[key] = amount
+    return out
 
 
 @dataclass(frozen=True)
@@ -23,6 +54,14 @@ class Policy:
     approved_vendors: frozenset[str]
     allowed_categories: frozenset[str]
     inr_per_usd: float = 88.0
+    budget_overrides: dict[str, float] = field(default_factory=dict)
+
+    def budget_for(self, when: datetime) -> float:
+        """This month's budget: a one-month override if there is one, otherwise the normal budget."""
+        return self.budget_overrides.get(when.strftime("%Y-%m"), self.monthly_budget_inr)
+
+    def is_raised(self, when: datetime) -> bool:
+        return when.strftime("%Y-%m") in self.budget_overrides
 
     @classmethod
     def from_dict(cls, d: dict) -> "Policy":
@@ -36,6 +75,7 @@ class Policy:
             approved_vendors=frozenset(d["approved_vendors"]),
             allowed_categories=frozenset(d["allowed_categories"]),
             inr_per_usd=float(d.get("inr_per_usd", 88.0)),
+            budget_overrides=_parse_overrides(d.get("budget_overrides")),
         )
 
 

@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 
 from .llm import LLM
+from .logs import step
 from .policy import DraftOrder, OrderLine
 from .tools import TOOL_SPECS, ToolContext, get_budget_status, get_recent_orders, search_catalogue
 
@@ -35,11 +36,20 @@ class AgentResult:
 
 def _run_tool(name: str, args: dict, ctx: ToolContext) -> dict:
     if name == "search_catalogue":
-        return search_catalogue(ctx, str(args.get("query", "")))
+        query = str(args.get("query", ""))
+        result = search_catalogue(ctx, query)
+        found = ", ".join(r["item_id"] for r in result["results"][:4]) or "nothing"
+        step("AGENT", f"search_catalogue(query={query!r}) -> {result['count']} results ({found})")
+        return result
     if name == "get_budget_status":
-        return get_budget_status(ctx)
+        result = get_budget_status(ctx)
+        step("AGENT", f"get_budget_status() -> INR {result['remaining_inr']:,.0f} left this month")
+        return result
     if name == "get_recent_orders":
-        return get_recent_orders(ctx)
+        result = get_recent_orders(ctx)
+        step("AGENT", f"get_recent_orders() -> {len(result['orders'])} orders in the last 7 days")
+        return result
+    step("AGENT", f"asked for unknown tool {name!r}")
     return {"error": f"Unknown tool '{name}'"}
 
 
@@ -64,11 +74,14 @@ def run_agent(request_text: str, llm: LLM, ctx: ToolContext) -> AgentResult:
         {"role": "user", "content": request_text},
     ]
     steps: list[dict] = []
-    for _ in range(MAX_STEPS):
+    for turn in range(1, MAX_STEPS + 1):
+        step("AGENT", f"thinking (turn {turn} of {MAX_STEPS})...")
         msg = llm.chat(messages, TOOL_SPECS)
         calls = msg.get("tool_calls") or []
         if not calls:
-            return AgentResult(draft=None, message=msg.get("content") or "The agent did not propose an order.", steps=steps)
+            text = msg.get("content") or "The agent did not propose an order."
+            step("AGENT", f"no order proposed: {text[:160]}")
+            return AgentResult(draft=None, message=text, steps=steps)
         messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
         for call in calls:
             name = call["function"]["name"]
@@ -79,7 +92,11 @@ def run_agent(request_text: str, llm: LLM, ctx: ToolContext) -> AgentResult:
             steps.append({"tool": name, "args": args})
             if name == "propose_order":
                 draft = _parse_draft(args, request_text)
+                items = ", ".join(f"{l.qty} x {l.item_id}" for l in draft.lines) or "no items"
+                step("AGENT", f"propose_order: {draft.supplier_id or '?'} | {items}")
+                step("AGENT", f"reasoning: {draft.reasoning[:200] or '(none)'}")
                 return AgentResult(draft=draft, message=draft.reasoning, steps=steps)
             result = _run_tool(name, args, ctx)
             messages.append({"role": "tool", "tool_call_id": call.get("id", name), "content": json.dumps(result)})
+    step("AGENT", f"gave up after {MAX_STEPS} turns without proposing an order")
     return AgentResult(draft=None, message="The agent ran out of steps without proposing an order.", steps=steps)
