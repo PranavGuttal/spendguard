@@ -1,6 +1,6 @@
 """End-to-end flow with a scripted fake LLM and a fake PayPal: no network."""
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -60,7 +60,22 @@ def test_small_order_is_paid_automatically():
     out = svc.submit_request("20 HSS tool bits for the lathe", now=NOW)["order"]
     assert out["status"] == "PAID"
     assert out["decisions"][0]["outcome"] == "APPROVE"
-    assert pp.payouts == [("spendguard-order-1", "sb-qsin4753706757@personal.example.com", round(3200 / 88, 2))]
+    assert len(pp.payouts) == 1
+    batch_id, email, usd = pp.payouts[0]
+    assert batch_id.startswith("spendguard-order-1-")
+    assert (email, usd) == ("sb-qsin4753706757@personal.example.com", round(3200 / 88, 2))
+
+
+def test_payout_ids_differ_after_demo_reset():
+    # PayPal refuses a reused sender_batch_id, and order numbers restart after a reset or redeploy
+    pp = FakePayPal()
+    svc = make(FakeLLM("HSS tool bit", "sharma-tools", [("hss-bit-10", 20)]), pp)
+    svc.submit_request("20 HSS tool bits for the lathe", now=NOW)
+    svc.reset_demo()
+    svc._llm = FakeLLM("HSS tool bit", "sharma-tools", [("hss-bit-10", 20)])
+    svc.submit_request("20 HSS tool bits for the lathe", now=NOW + timedelta(minutes=5))
+    assert len(pp.payouts) == 2
+    assert pp.payouts[0][0] != pp.payouts[1][0]
 
 
 def test_agent_sees_catalogue_search_results():

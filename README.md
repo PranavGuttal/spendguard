@@ -79,7 +79,7 @@ All calls go to the PayPal **sandbox** REST API (`https://api-m.sandbox.paypal.c
 | API | Used for |
 | --- | --- |
 | `POST /v1/oauth2/token` | Client-credentials login; the token is cached until shortly before it expires |
-| `POST /v1/payments/payouts` | Paying the supplier from the company's sandbox business account; `sender_batch_id` = order id, so a retry never pays twice |
+| `POST /v1/payments/payouts` | Paying the supplier from the company's sandbox business account; `sender_batch_id` is built from the order number and its creation time, so a retry never pays twice |
 | `GET /v1/payments/payouts/{batch_id}` | Confirming the payout reached SUCCESS before the order is marked Paid |
 | `GET /v1/reporting/transactions` | "Ask about spending": what PayPal actually recorded (needs **Transaction search** ticked in the app's features; sandbox data can lag up to about 3 hours) |
 
@@ -157,7 +157,7 @@ cd backend
 python -m pytest
 ```
 
-57 tests cover every rule, the three demo flows, owner approval and rejection, double-payment protection,
+58 tests cover every rule, the three demo flows, owner approval and rejection, double-payment protection,
 PayPal failures, the one-month budget override, the spending analyst, the MCP tools (including a real stdio
 handshake), the API and the demo password.
 
@@ -177,7 +177,7 @@ backend/
   policy.yaml         your rules
   data/catalogue.json suppliers and items
   static/             built web app
-  tests/              57 tests
+  tests/              58 tests
 frontend/             React + TypeScript + AG Grid source (npm run build → backend/static)
 render.yaml           Render deployment
 ```

@@ -169,8 +169,12 @@ class SpendGuardService:
 
     # --------------------------------------------------------------- payment
     def _pay(self, s: Session, order: Order) -> None:
-        sender_batch_id = f"spendguard-order-{order.id}"  # idempotency key: one payout per order, ever
-        existing = s.exec(select(Payment).where(Payment.sender_batch_id == sender_batch_id)).first()
+        # Idempotency key: one payout per order, ever. It includes the order's creation time because
+        # PayPal remembers every sender_batch_id, and order numbers restart at 1 on a fresh database
+        # (a new deploy or a demo reset); "spendguard-order-1" alone would be refused as a duplicate.
+        sender_batch_id = f"spendguard-order-{order.id}-{order.created_at:%Y%m%d%H%M%S%f}"
+        existing = s.exec(select(Payment).where(
+            (Payment.order_id == order.id) | (Payment.sender_batch_id == sender_batch_id))).first()
         if existing is not None:
             step("PAYPAL", f"order #{order.id} already has a payout ({existing.status}); not paying again")
             return
