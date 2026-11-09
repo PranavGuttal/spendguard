@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, ApiError } from '../api'
+import { RichText } from './RichText'
 
 const SUGGESTIONS = [
   'How much have we spent this month, and with which suppliers?',
@@ -49,7 +50,7 @@ export function AskBox({ onError }: { onError: (m: string, status?: number) => v
       </div>
       {answer && (
         <div className="ask__answer" role="status">
-          <p>{answer.text}</p>
+          <div className="ask__text"><RichText text={answer.text} /></div>
           {answer.used.length > 0 && (
             <p className="ask__used">Checked: {answer.used.map((u) => TOOL_LABEL[u] ?? u).join(', ')}. Read-only: asking never buys or pays.</p>
           )}
