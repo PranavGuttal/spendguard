@@ -95,7 +95,7 @@ export default function App() {
             const value = new FormData(e.currentTarget).get('pw')?.toString() ?? ''
             savePassword(value); setNeedPassword(false); setError(null); reload()
           }}>
-            <label htmlFor="pw">This demo is protected. Enter the demo password from the project README.</label>
+            <label htmlFor="pw">Enter the demo password to place or approve orders. Judges: it is in the Devpost testing notes.</label>
             <div className="pw__row">
               <input id="pw" name="pw" type="password" autoComplete="off" required />
               <button className="btn btn--primary" type="submit">Unlock demo</button>

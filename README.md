@@ -11,7 +11,7 @@ so no real money moves.
 
 ## Try it
 
-- **Live demo:** _(Render link goes here after deployment)_. The password for placing orders is in the Devpost testing notes.
+- **Live demo:** https://spendguard-ithe.onrender.com (the password for placing orders is in the Devpost testing notes).
   The free server sleeps when idle, so the first page load can take about a minute.
 - **Run it on your own machine:** see [Run locally](#run-locally).
 
