@@ -47,7 +47,7 @@ Owner's request ──► AI agent (Groq) ──► draft order ──► Policy
 2. The **policy engine** checks the proposal against nine rules and returns APPROVE, NEEDS_APPROVAL or BLOCK.
    Prices always come from the catalogue, never from the model.
 3. Money moves in one place only (`service.py`), and only after APPROVE or the owner's click.
-   Each order can be paid once: the order id is PayPal's idempotency key.
+   Each order can be paid once: it gets its own PayPal idempotency key (order number plus creation time).
 4. Every decision, by the rules or by the owner, goes into the audit log with its reasons.
 
 ### The nine rules (`backend/policy.yaml`)
@@ -93,6 +93,18 @@ SpendGuard refuses to start a payment if `PAYPAL_ENV` is anything other than `sa
 | Spending analyst (`insights.py`) | Same model, read-only tools: `spend_summary`, `list_orders`, `paypal_transactions` |
 | Model adapter (`llm.py`) | Switch to Google Gemini by setting `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` |
 | MCP server (`mcp_server.py`) | Lets Claude Desktop or any MCP client buy through the same rules (see below) |
+
+## Built with
+
+| Tool | How SpendGuard uses it |
+| --- | --- |
+| **PayPal** (sandbox REST APIs) | OAuth, Payouts, payout status and Transaction Search (see [PayPal integration](#paypal-integration)) |
+| **Groq** (`openai/gpt-oss-120b`) | The purchasing agent and the spending analyst (see [AI](#ai)) |
+| **AG Grid** (Community, v36) | The Orders and Audit log tables in the web app: sorting, filtering and status filters (`frontend/src/pages/OrdersPage.tsx`, `AuditPage.tsx`, theme in `gridTheme.ts`) |
+| **Render** | Hosts the live demo as one free web service from `render.yaml`; every push to `main` redeploys it, and secrets are kept in Render's environment settings |
+| FastAPI, SQLModel, SQLite | Backend API and order, decision and payment records |
+| React, TypeScript, Vite | Web app, built into `backend/static` |
+| Model Context Protocol (`mcp`) | Lets Claude Desktop or any MCP client buy through the same rules |
 
 ## Run locally
 
